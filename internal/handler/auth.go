@@ -45,15 +45,22 @@ func (h *AuthHandler) loginHandler(c fiber.Ctx) error {
 	}
 
 	// Передаём Ctx напрямую
-	token, user, err := h.service.Login(c, req.Login, req.Password)
+	token, _, exp, err := h.service.Login(c, req.Login, req.Password)
 	if err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid credentials"})
 	}
-
-	return c.JSON(fiber.Map{
-		"token": token,
-		"user":  user,
+	c.Cookie(&fiber.Cookie{
+		Expires:  exp,
+		Name:     "api_token",
+		Value:    token,
+		Path:     "/",
+		Domain:   c.Host(),
+		SameSite: fiber.CookieSameSiteStrictMode,
+		Secure:   false,
+		HTTPOnly: false,
 	})
+
+	return c.SendStatus(200)
 }
 
 func (h *AuthHandler) validateTokenHandler(c fiber.Ctx) error {

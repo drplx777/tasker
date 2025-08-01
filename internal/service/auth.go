@@ -51,7 +51,7 @@ func (s *AuthService) Register(ctx context.Context, req model.RegisterRequest) (
 	return &user, err
 }
 
-func (s *AuthService) Login(ctx context.Context, login, password string) (string, *model.User, error) {
+func (s *AuthService) Login(ctx context.Context, login, password string) (string, *model.User, time.Time, error) {
 	const query = `
         SELECT id, name, surname, middlename, login, roleID, password 
         FROM users WHERE login = $1
@@ -67,28 +67,28 @@ func (s *AuthService) Login(ctx context.Context, login, password string) (string
 		&user.RoleID,
 		&user.Password,
 	)
-
+	exp := time.Now().Add(72 * time.Hour)
 	if err != nil {
-		return "", nil, err
+		return "", nil, exp, err
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
-		return "", nil, err
+		return "", nil, exp, err
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub":  user.ID,
 		"role": user.RoleID,
-		"exp":  time.Now().Add(time.Hour * 72).Unix(),
+		"exp":  exp.Unix(),
 	})
 
 	tokenString, err := token.SignedString([]byte(s.jwtSecret))
 	if err != nil {
-		return "", nil, err
+		return "", nil, exp, err
 	}
 
 	user.Password = ""
-	return tokenString, &user, nil
+	return tokenString, &user, exp, nil
 }
 
 func (s *AuthService) ValidateToken(tokenString string) (jwt.MapClaims, error) {

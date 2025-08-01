@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"log/slog"
-	"strings"
 	"tasker/internal/service"
 
 	"github.com/gofiber/fiber/v3"
@@ -14,16 +13,10 @@ func AuthMiddleware(authService *service.AuthService) fiber.Handler {
 			return c.Next()
 		}
 
-		authHeader := c.Get("Authorization")
-		if authHeader == "" {
-			slog.Warn("Authorization header missing")
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Authorization header missing"})
-		}
-
-		token := strings.TrimPrefix(authHeader, "Bearer ")
-		if token == authHeader {
-			slog.Warn("Invalid token format")
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid token format"})
+		token := c.Cookies("api_token")
+		if token == "" {
+			slog.Warn("Token not found in cookies")
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Token not found"})
 		}
 
 		claims, err := authService.ValidateToken(token)
