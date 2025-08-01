@@ -32,7 +32,7 @@ type Config struct {
 }
 
 func MustLoad() *Config {
-	if err := dotenv.LoadEnv(); err != nil {
+	if err := dotenv.LoadEnv(".env"); err != nil {
 		panic(errors.Wrap(err, "failed to load .env"))
 	}
 
