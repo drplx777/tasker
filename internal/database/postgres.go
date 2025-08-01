@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -14,13 +15,34 @@ func NewPool(ctx context.Context, connString string) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
 
-	pool, err := pgxpool.NewWithConfig(ctx, config)
-	if err != nil {
-		return nil, fmt.Errorf("create pool: %w", err)
+	// Настройка пула соединений
+	config.MaxConns = 10
+	config.MinConns = 2
+	config.HealthCheckPeriod = 1 * time.Minute
+	config.MaxConnLifetime = 30 * time.Minute
+
+	// Экспоненциальная задержка для повторных попыток
+	var pool *pgxpool.Pool
+	const maxAttempts = 10
+	for i := 0; i < maxAttempts; i++ {
+		pool, err = pgxpool.NewWithConfig(ctx, config)
+		if err == nil {
+			err = pool.Ping(ctx)
+			if err == nil {
+				break
+			}
+		}
+
+		if i < maxAttempts-1 {
+			delay := time.Second * time.Duration(i*2)
+			log.Printf("Database connection failed (attempt %d/%d), retrying in %v: %v",
+				i+1, maxAttempts, delay, err)
+			time.Sleep(delay)
+		}
 	}
 
-	if err := pool.Ping(ctx); err != nil {
-		return nil, fmt.Errorf("ping failed: %w", err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database after %d attempts: %w", maxAttempts, err)
 	}
 
 	if err := createTables(ctx, pool); err != nil {

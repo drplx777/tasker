@@ -37,6 +37,13 @@ func main() {
 	userService := service.NewUserService(dbPool)
 
 	app := fiber.New()
+	//healthchek
+	app.Get("/health", func(c fiber.Ctx) error {
+		if err := dbPool.Ping(context.Background()); err != nil {
+			return c.Status(fiber.StatusServiceUnavailable).SendString("DB not ready")
+		}
+		return c.SendString("OK")
+	})
 
 	// Middleware
 	app.Use(middleware.SlogLogger)

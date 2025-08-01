@@ -24,9 +24,6 @@ WORKDIR /app
 # Копируем бинарник из builder stage
 COPY --from=builder /app/tasker .
 
-# Копируем .env файл
-COPY .env .
-
 # Открываем порт
 EXPOSE 3000
 
