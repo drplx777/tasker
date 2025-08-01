@@ -1,5 +1,5 @@
 # Runtime stage
-FROM alpine:latest
+FROM golang:1.24-alpine AS builder
 
 RUN apk --no-cache add ca-certificates tzdata
 
