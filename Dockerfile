@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.24-alpine AS builder
+FROM golang:1.22-alpine AS builder
 
 WORKDIR /app
 
@@ -24,7 +24,6 @@ WORKDIR /app
 # Копируем бинарник из builder stage
 COPY --from=builder /app/tasker .
 
-# Открываем порт
 EXPOSE 3000
 
 # Запускаем приложение
