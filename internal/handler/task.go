@@ -89,6 +89,7 @@ func (h *TaskHandler) doneTask(c fiber.Ctx) error {
 	return c.JSON(task)
 }
 
+// ВРЕМЕННО
 func (h *TaskHandler) mockTasks(c fiber.Ctx) error {
 	assigner2 := "user-2"
 	assigner3 := "user-3"

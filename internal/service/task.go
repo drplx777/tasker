@@ -18,14 +18,29 @@ func NewTaskService(dbPool *pgxpool.Pool) *TaskService {
 func (s *TaskService) CreateTask(ctx context.Context, task model.Task) (*model.Task, error) {
 	const query = `
 		INSERT INTO tasks (
-			title, description, status, "reporterD", "assignerID", "reviewerID", 
-			"approverID", "approveStatus", deadline, "dashboardID", "blockedBy"
-		) 
+			title,
+			description,
+			status,
+			"reporterID",
+			"assignerID",
+			"reviewerID",
+			"approverID",
+			approve_status,
+			deadline,
+			"dashboardID",
+			blocked_by
+		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-		RETURNING id, created_at, started_at, done_at
+		RETURNING 
+			id,
+			created_at,
+			started_at,
+			done_at
 	`
 
+	// Копируем входную задачу, чтобы не мутировать оригинал
 	newTask := task
+
 	err := s.dbPool.QueryRow(ctx, query,
 		task.Title,
 		task.Description,
@@ -44,8 +59,11 @@ func (s *TaskService) CreateTask(ctx context.Context, task model.Task) (*model.T
 		&newTask.StartedAt,
 		&newTask.CompletedAt,
 	)
+	if err != nil {
+		return nil, err
+	}
 
-	return &newTask, err
+	return &newTask, nil
 }
 
 func (s *TaskService) GetTaskByID(ctx context.Context, id string) (*model.Task, error) {
