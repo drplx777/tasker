@@ -48,7 +48,7 @@ func main() {
 	// Middleware
 	app.Use(middleware.SlogLogger())
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},
+		AllowOrigins:     cfg.CORS.AllowOrigins,
 		AllowMethods:     cfg.CORS.AllowMethods,
 		AllowHeaders:     cfg.CORS.AllowHeaders,
 		AllowCredentials: cfg.CORS.AllowCredentials,
