@@ -99,12 +99,15 @@ func (s *TaskService) GetTaskByID(ctx context.Context, id string) (*model.Task, 
 
 func (s *TaskService) ListTasks(ctx context.Context) ([]model.Task, error) {
 	const query = `
-        SELECT
-            id, title, description, status, "reporterD", "assignerID", "reviewerID",
-            "approverID", "approveStatus", created_at, started_at, done_at,
-            deadline, "dashboardID", "blockedBy"
-        FROM tasks
-    `
+INSERT INTO tasks (
+    title, description, status, "reporterD",
+    "assignerID", "reviewerID", "approverID",
+    "approveStatus", deadline, "dashboardID",
+    blocked_by
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+RETURNING *
+`
 	rows, err := s.dbPool.Query(ctx, query)
 	if err != nil {
 		return nil, err
