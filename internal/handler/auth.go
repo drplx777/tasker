@@ -54,7 +54,7 @@ func (h *AuthHandler) loginHandler(c fiber.Ctx) error {
 		Name:     "api_token",
 		Value:    token,
 		Path:     "/",
-		Domain:   "localhost",
+		Domain:   "193.38.235.173",
 		SameSite: fiber.CookieSameSiteLaxMode,
 		Secure:   false,
 		HTTPOnly: false,
