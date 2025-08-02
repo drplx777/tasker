@@ -35,6 +35,7 @@ func main() {
 	authService := service.NewAuthService(dbPool, cfg.JWTSecret)
 	taskService := service.NewTaskService(dbPool)
 	userService := service.NewUserService(dbPool)
+	dashboardService := service.NewDashboardService(dbPool)
 
 	app := fiber.New()
 	//healthchek
@@ -59,12 +60,14 @@ func main() {
 	authHandler := handler.NewAuthHandler(authService)
 	taskHandler := handler.NewTaskHandler(taskService)
 	userHandler := handler.NewUserHandler(userService)
+	dashboardsHandler := handler.NewDashboardsHandler(dashboardService)
 
 	// Регистрация маршрутов
 	authHandler.RegisterRoutes(app)
 	app.Use(middleware.AuthMiddleware(authService))
 	taskHandler.RegisterRoutes(app)
 	userHandler.RegisterPublicRoutes(app)
+	dashboardsHandler.RegisterRoutes(app)
 
 	// Graceful shutdown
 	shutdown := make(chan os.Signal, 1)

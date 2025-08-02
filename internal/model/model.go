@@ -44,3 +44,7 @@ type LoginRequest struct {
 	Login    string `json:"login"`
 	Password string `json:"password"`
 }
+type DashBoards struct {
+	ID   string `json:"ID"`
+	Name string `json:"name"`
+}
