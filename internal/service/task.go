@@ -153,6 +153,50 @@ func (s *TaskService) ListTasks(ctx context.Context) ([]model.Task, error) {
 
 	return tasks, nil
 }
+func (s *TaskService) GetTasksByDashboardID(ctx context.Context, dashboardID string) ([]model.Task, error) {
+	const query = `
+		SELECT 
+			id, title, description, status, "reporterD", "assignerID", "reviewerID", 
+			"approverID", "approveStatus", created_at, updated_at, "started_At", done_at,
+			deadline, "dashboardID", "blockedBy"
+		FROM tasks WHERE "dashboardID" = $1
+	`
+
+	rows, err := s.dbPool.Query(ctx, query, dashboardID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	tasks := []model.Task{}
+	for rows.Next() {
+		var task model.Task
+		err := rows.Scan(
+			&task.ID,
+			&task.Title,
+			&task.Description,
+			&task.Status,
+			&task.ReporterID,
+			&task.AssignerID,
+			&task.ReviewerID,
+			&task.ApproverID,
+			&task.ApproveStatus,
+			&task.CreatedAt,
+			&task.UpdatedAt,
+			&task.StartedAt,
+			&task.CompletedAt,
+			&task.DeadLine,
+			&task.DashboardID,
+			&task.BlockedBy,
+		)
+		if err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, task)
+	}
+
+	return tasks, nil
+}
 
 func (s *TaskService) UpdateTask(ctx context.Context, id string, task model.Task) (*model.Task, error) {
 	const query = `

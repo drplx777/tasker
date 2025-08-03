@@ -24,6 +24,7 @@ func (h *TaskHandler) RegisterRoutes(app *fiber.App) {
 	app.Delete("/delete/:id", h.deleteTask)
 	app.Put("/done/:id", h.doneTask)
 	app.Get("/tasklist", h.mockTasks)
+	app.Get("/taskByDB/:id", h.GetTasksByDashboardID)
 }
 
 func (h *TaskHandler) createTask(c fiber.Ctx) error {
@@ -44,6 +45,14 @@ func (h *TaskHandler) listTasks(c fiber.Ctx) error {
 	tasks, err := h.service.ListTasks(c)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to list tasks"})
+	}
+	return c.JSON(tasks)
+}
+func (h *TaskHandler) GetTasksByDashboardID(c fiber.Ctx) error {
+	id := c.Params("id")
+	tasks, err := h.service.GetTasksByDashboardID(c, id)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Tasks not found for this dashboard"})
 	}
 	return c.JSON(tasks)
 }
