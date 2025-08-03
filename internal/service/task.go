@@ -51,6 +51,7 @@ func (s *TaskService) CreateTask(ctx context.Context, task model.Task) (*model.T
 		task.ApproverID,
 		task.ApproveStatus,
 		task.DeadLine,
+		task.UpdatedAt,
 		task.DashboardID,
 		task.BlockedBy,
 	).Scan(
@@ -70,11 +71,10 @@ func (s *TaskService) GetTaskByID(ctx context.Context, id string) (*model.Task, 
 	const query = `
 		SELECT 
 			id, title, description, status, "reporterD", "assignerID", "reviewerID", 
-			"approverID", "approveStatus", created_at, started_at, done_at,
-			deadline, "dashboardID", "blockedBy"
+			"approverID", "approveStatus", created_at, updated_at, "started_At", done_at,
+			deadline, "dashboardID", "blockedBy"  -- Исправлено
 		FROM tasks WHERE id = $1
 	`
-
 	var task model.Task
 	err := s.dbPool.QueryRow(ctx, query, id).Scan(
 		&task.ID,
@@ -99,15 +99,12 @@ func (s *TaskService) GetTaskByID(ctx context.Context, id string) (*model.Task, 
 
 func (s *TaskService) ListTasks(ctx context.Context) ([]model.Task, error) {
 	const query = `
-INSERT INTO tasks (
-    title, description, status, "reporterD",
-    "assignerID", "reviewerID", "approverID",
-    "approveStatus", deadline, "dashboardID",
-    blocked_by
-)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-RETURNING *
-`
+        SELECT 
+            id, title, description, status, "reporterD", "assignerID", "reviewerID", 
+            "approverID", "approveStatus", created_at, updated_at, "started_At", done_at,
+            deadline, "dashboardID", "blockedBy"
+        FROM tasks
+    `
 	rows, err := s.dbPool.Query(ctx, query)
 	if err != nil {
 		return nil, err
@@ -128,6 +125,7 @@ RETURNING *
 			&task.ApproverID,
 			&task.ApproveStatus,
 			&task.CreatedAt,
+			&task.UpdatedAt,
 			&task.StartedAt,
 			&task.CompletedAt,
 			&task.DeadLine,
@@ -152,7 +150,7 @@ func (s *TaskService) UpdateTask(ctx context.Context, id string, task model.Task
 			"assignerID" = COALESCE($5, "assignerID"),
 			"reviewerID" = COALESCE($6, "reviewerID"),
 			"approveStatus" = COALESCE($7, "approveStatus"),
-			started_at = COALESCE($8, started_at),
+			"started_At" = COALESCE($8, "started_At"),
 			done_at = COALESCE($9, done_at),
 			deadline = COALESCE($10, deadline),
 			"dashboardID" = COALESCE($11, "dashboardID"),
@@ -192,7 +190,10 @@ func (s *TaskService) MarkTaskDone(ctx context.Context, id string) (*model.Task,
 			done_at = NOW(),
 			updated_at = NOW()
 		WHERE id = $1
-		RETURNING *
+		RETURNING 
+			id, title, description, status, "reporterD", "assignerID", "reviewerID", 
+			"approverID", "approveStatus", created_at, updated_at, "started_At", done_at,
+			deadline, "dashboardID", "blockedBy"
 	`
 
 	var task model.Task
