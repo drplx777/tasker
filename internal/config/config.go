@@ -37,7 +37,7 @@ func MustLoad() *Config {
 	}
 
 	return &Config{
-		Port:      getEnv("PORT", "3000"),
+		Port:      getEnv("PORT", "8000"),
 		JWTSecret: mustGetEnv("JWT_SECRET"),
 		DB: DBConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
