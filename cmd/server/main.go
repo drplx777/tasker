@@ -64,7 +64,7 @@ func main() {
 
 	// Регистрация маршрутов
 	authHandler.RegisterRoutes(app)
-	app.Use(middleware.AuthMiddleware(authService))
+	//app.Use(middleware.AuthMiddleware(authService))
 	taskHandler.RegisterRoutes(app)
 	userHandler.RegisterPublicRoutes(app)
 	dashboardsHandler.RegisterRoutes(app)
