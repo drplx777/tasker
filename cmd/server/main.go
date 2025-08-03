@@ -65,6 +65,7 @@ func main() {
 	// Регистрация маршрутов
 	authHandler.RegisterRoutes(app)
 	app.Use(middleware.AuthMiddleware(authService))
+	app.Get("/api/getuserbyJWT", authHandler.GetUserHandler)
 	taskHandler.RegisterRoutes(app)
 	userHandler.RegisterPublicRoutes(app)
 	dashboardsHandler.RegisterRoutes(app)

@@ -9,7 +9,7 @@ import (
 
 func AuthMiddleware(authService *service.AuthService) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		if c.Path() == "/api/login" || c.Path() == "/api/register" || c.Path() == "/api/getuserbyJWT" {
+		if c.Path() == "/api/login" || c.Path() == "/api/register" {
 			return c.Next()
 		}
 

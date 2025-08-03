@@ -19,7 +19,6 @@ func (h *AuthHandler) RegisterRoutes(app *fiber.App) {
 	app.Post("/api/register", h.registerHandler)
 	app.Post("/api/login", h.loginHandler)
 	app.Get("/api/validate", h.validateTokenHandler)
-	app.Get("/api/getuserbyJWT", h.getUserHandler)
 }
 
 // Все хендлеры принимают fiber.Ctx (интерфейс), который реализует context.Context
@@ -81,7 +80,7 @@ func (h *AuthHandler) validateTokenHandler(c fiber.Ctx) error {
 	})
 }
 
-func (h *AuthHandler) getUserHandler(c fiber.Ctx) error {
+func (h *AuthHandler) GetUserHandler(c fiber.Ctx) error {
 	// Получаем userID из middleware
 	userIDVal := c.Locals("userID")
 	userID, ok := userIDVal.(int)
