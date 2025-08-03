@@ -16,7 +16,11 @@ func NewDashboardService(dbPool *pgxpool.Pool) *DashboardService {
 }
 
 func (s *DashboardService) ListDashboards(ctx context.Context) ([]model.DashBoards, error) {
-	const query = ``
+	const query = `
+        SELECT id,
+               name
+        FROM dashboards;
+    `
 
 	rows, err := s.dbPool.Query(ctx, query)
 	if err != nil {
