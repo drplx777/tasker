@@ -42,3 +42,40 @@ func (s *DashboardService) ListDashboards(ctx context.Context) ([]model.DashBoar
 	}
 	return dashboards, nil
 }
+
+func (s *DashboardService) GetDashboardById(ctx context.Context, id string) (*model.DashBoards, error) {
+	const query = `
+		SELECT id,
+			   name
+		FROM dashboards
+		WHERE id = $1;
+	`
+
+	var dashboard model.DashBoards
+	err := s.dbPool.QueryRow(ctx, query, id).Scan(
+		&dashboard.ID,
+		&dashboard.Name,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &dashboard, nil
+}
+
+func (s *DashboardService) CreateDashboard(ctx context.Context, dashboard model.DashBoards) (*model.DashBoards, error) {
+	const query = `
+		INSERT INTO dashboards (name)
+		VALUES ($1)
+		RETURNING id, name;
+	`
+
+	var newDashboard model.DashBoards
+	err := s.dbPool.QueryRow(ctx, query, dashboard.Name).Scan(
+		&newDashboard.ID,
+		&newDashboard.Name,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &newDashboard, nil
+}
