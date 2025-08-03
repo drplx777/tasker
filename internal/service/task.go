@@ -2,8 +2,11 @@ package service
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"tasker/internal/model"
 
+	"github.com/jackc/pgx"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -16,6 +19,15 @@ func NewTaskService(dbPool *pgxpool.Pool) *TaskService {
 }
 
 func (s *TaskService) CreateTask(ctx context.Context, task model.Task) (*model.Task, error) {
+	var dashboardID string
+	err := s.dbPool.QueryRow(ctx, "SELECT id FROM dashboards WHERE name = $1", task.DashboardName).Scan(&dashboardID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("dashboard not found: %s", task.DashboardName)
+		}
+		return nil, err
+	}
+	task.DashboardID = dashboardID
 	const query = `
         INSERT INTO tasks (
             title,
@@ -41,7 +53,7 @@ func (s *TaskService) CreateTask(ctx context.Context, task model.Task) (*model.T
 
 	newTask := task
 
-	err := s.dbPool.QueryRow(ctx, query,
+	err = s.dbPool.QueryRow(ctx, query,
 		task.Title,
 		task.Description,
 		task.Status,
