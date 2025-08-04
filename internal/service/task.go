@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"tasker/internal/model"
@@ -265,6 +266,32 @@ func (s *TaskService) DeleteTask(ctx context.Context, id string) error {
 }
 
 func (s *TaskService) MarkTaskDone(ctx context.Context, id string) (*model.Task, error) {
+	const selectQuery = `
+        SELECT "blockedBy", "approveStatus"
+        FROM tasks
+        WHERE id = $1
+    `
+	var blockedBy sql.NullString
+	var approveStatus string
+
+	err := s.dbPool.QueryRow(ctx, selectQuery, id).Scan(&blockedBy, &approveStatus)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("task with id %q not found", id)
+		}
+		return nil, err
+	}
+
+	// 2) Проверяем, заблокирована ли задача
+	if blockedBy.Valid && blockedBy.String != "" {
+		return nil, fmt.Errorf("cannot mark done: task is blocked by %s", blockedBy.String)
+	}
+
+	// 3) Проверяем статус одобрения
+	if approveStatus == "need-approve" {
+		return nil, errors.New("cannot mark done: task needs approval")
+	}
+
 	const query = `
         UPDATE tasks SET
             status = 'done',
@@ -278,7 +305,7 @@ func (s *TaskService) MarkTaskDone(ctx context.Context, id string) (*model.Task,
     `
 
 	var task model.Task
-	err := s.dbPool.QueryRow(ctx, query, id).Scan(
+	err = s.dbPool.QueryRow(ctx, query, id).Scan(
 		&task.ID,
 		&task.Title,
 		&task.Description,
