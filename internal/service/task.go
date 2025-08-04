@@ -20,6 +20,8 @@ func NewTaskService(dbPool *pgxpool.Pool) *TaskService {
 
 func (s *TaskService) CreateTask(ctx context.Context, task model.Task) (*model.Task, error) {
 	// Подготовка поля blockedBy из массива Blockers
+	const defaultStatus = "to-do"
+
 	var blockedBy sql.NullString
 	if len(task.BlockedBy) > 0 && task.BlockedBy[0] != "" {
 		blockedBy.String = task.BlockedBy[0]
@@ -49,7 +51,8 @@ func (s *TaskService) CreateTask(ctx context.Context, task model.Task) (*model.T
         done_at
     `
 
-	newTask := task // копируем входную структуру
+	newTask := task                // копируем входную структуру
+	newTask.Status = defaultStatus // устанавливаем статус по умолчанию
 	err := s.dbPool.QueryRow(ctx, query,
 		task.Title,
 		task.Description,
