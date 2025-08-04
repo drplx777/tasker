@@ -16,6 +16,7 @@ func NewUserHandler(service *service.UserService) *UserHandler {
 
 func (h *UserHandler) RegisterPublicRoutes(app *fiber.App) {
 	app.Post("/user/login", h.loginHandler)
+	app.Get("/Users", h.listUsers)
 }
 
 func (h *UserHandler) loginHandler(c fiber.Ctx) error {
@@ -34,4 +35,12 @@ func (h *UserHandler) loginHandler(c fiber.Ctx) error {
 	}
 
 	return c.JSON(user)
+}
+
+func (h *UserHandler) listUsers(c fiber.Ctx) error {
+	users, err := h.service.GetAllUsers(c)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to list users"})
+	}
+	return c.JSON(users)
 }

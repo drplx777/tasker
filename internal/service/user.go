@@ -99,3 +99,33 @@ func (s *UserService) GetUserByID(ctx context.Context, id int) (*model.User, err
 
 	return &user, err
 }
+
+func (s *UserService) GetAllUsers(ctx context.Context) ([]model.User, error) {
+	const query = `
+		SELECT id, name, surname, middlename
+		FROM users;
+	`
+
+	rows, err := s.dbPool.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []model.User
+	for rows.Next() {
+		var user model.User
+		err := rows.Scan(
+			&user.ID,
+			&user.Name,
+			&user.Surname,
+			&user.Middlename,
+		)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+
+	return users, nil
+}
