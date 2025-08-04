@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"tasker/internal/model"
 
-	"github.com/jackc/pgx"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -20,41 +19,38 @@ func NewTaskService(dbPool *pgxpool.Pool) *TaskService {
 }
 
 func (s *TaskService) CreateTask(ctx context.Context, task model.Task) (*model.Task, error) {
-	var dashboardID string
-	err := s.dbPool.QueryRow(ctx, "SELECT id FROM dashboards WHERE name = $1", task.DashboardName).Scan(&dashboardID)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("dashboard not found: %s", task.DashboardName)
-		}
-		return nil, err
+	// Подготовка поля blockedBy из массива Blockers
+	var blockedBy sql.NullString
+	if len(task.BlockedBy) > 0 && task.BlockedBy[0] != "" {
+		blockedBy.String = task.BlockedBy[0]
+		blockedBy.Valid = true
 	}
-	task.DashboardID = dashboardID
+
 	const query = `
-        INSERT INTO tasks (
-            title,
-            description,
-            status,
-            "reporterD",
-            "assignerID",
-            "reviewerID",
-            "approverID",
-            "approveStatus",
-            deadline,
-            "dashboardID",
-            "blockedBy"
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-        RETURNING 
-            id,
-            created_at,
-            updated_at,
-            "started_At",
-            done_at
+    INSERT INTO tasks (
+        title,
+        description,
+        status,
+        "reporterD",
+        "assignerID",
+        "reviewerID",
+        "approverID",
+        "approveStatus",
+        deadline,
+        "dashboardID",
+        "blockedBy"
+    )
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+    RETURNING
+        id,
+        created_at,
+        updated_at,
+        "started_At",
+        done_at
     `
 
-	newTask := task
-
-	err = s.dbPool.QueryRow(ctx, query,
+	newTask := task // копируем входную структуру
+	err := s.dbPool.QueryRow(ctx, query,
 		task.Title,
 		task.Description,
 		task.Status,
@@ -65,7 +61,7 @@ func (s *TaskService) CreateTask(ctx context.Context, task model.Task) (*model.T
 		task.ApproveStatus,
 		task.DeadLine,
 		task.DashboardID,
-		task.BlockedBy,
+		blockedBy,
 	).Scan(
 		&newTask.ID,
 		&newTask.CreatedAt,
@@ -326,3 +322,5 @@ func (s *TaskService) MarkTaskDone(ctx context.Context, id string) (*model.Task,
 
 	return &task, err
 }
+
+//TO-DO: UpdateApproveStatugos
