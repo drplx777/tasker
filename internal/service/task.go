@@ -56,7 +56,7 @@ func (s *TaskService) CreateTask(ctx context.Context, task model.Task) (*model.T
 	err := s.dbPool.QueryRow(ctx, query,
 		task.Title,
 		task.Description,
-		task.Status,
+		newTask.Status,
 		task.ReporterID,
 		task.AssignerID,
 		task.ReviewerID,
