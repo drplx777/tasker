@@ -24,8 +24,6 @@ func (h *AuthHandler) RegisterRoutes(app *fiber.App) {
 
 // Все хендлеры принимают fiber.Ctx (интерфейс), который реализует context.Context
 func (h *AuthHandler) logoutHandler(c fiber.Ctx) error {
-	// Здесь можно реализовать логику выхода пользователя
-	// Например, удалить токен из cookies
 	c.ClearCookie("api_token")
 	return c.SendStatus(fiber.StatusOK)
 }
