@@ -83,13 +83,26 @@ func (s *TaskService) CreateTask(ctx context.Context, task model.Task) (*model.T
 
 func (s *TaskService) GetTaskByID(ctx context.Context, id string) (*model.Task, error) {
 	const query = `
-        SELECT 
-            id, title, description, status, "reporterD", "assignerID", "reviewerID", 
-            "approverID", "approveStatus", created_at, updated_at, "started_At", done_at,
-            deadline, "dashboardID", "blockedBy"
-        FROM tasks WHERE id = $1
+    SELECT
+      t.id, t.title, t.description, t.status, t."reporterD", t."assignerID", t."reviewerID", t."approverID",
+      t."approveStatus", t.created_at, t.updated_at, t."started_At", t.done_at,
+      t.deadline, t."dashboardID", t."blockedBy",
+      (rep.name || ' ' || rep.surname) AS reporter_name,
+      (ass.name || ' ' || ass.surname) AS assigner_name,
+      (app.name || ' ' || app.surname) AS approver_name
+    FROM tasks t
+    LEFT JOIN users rep ON rep.id::text = t."reporterD"
+    LEFT JOIN users ass ON ass.id::text = t."assignerID"
+    LEFT JOIN users app ON app.id::text = t."approverID"
+    WHERE t.id = $1
     `
+
 	var task model.Task
+	// sql.NullString безопасно примет NULL из БД
+	var reporterName sql.NullString
+	var assignerName sql.NullString
+	var approverName sql.NullString
+
 	err := s.dbPool.QueryRow(ctx, query, id).Scan(
 		&task.ID,
 		&task.Title,
@@ -107,9 +120,28 @@ func (s *TaskService) GetTaskByID(ctx context.Context, id string) (*model.Task, 
 		&task.DeadLine,
 		&task.DashboardID,
 		&task.BlockedBy,
+		&reporterName,
+		&assignerName,
+		&approverName,
 	)
+	if err != nil {
+		return nil, err
+	}
 
-	return &task, err
+	if reporterName.Valid {
+		v := reporterName.String
+		task.ReporterName = &v
+	}
+	if assignerName.Valid {
+		v := assignerName.String
+		task.AssignerName = &v
+	}
+	if approverName.Valid {
+		v := approverName.String
+		task.ApproverName = &v
+	}
+
+	return &task, nil
 }
 
 func (s *TaskService) ListTasks(ctx context.Context) ([]model.Task, error) {

@@ -19,6 +19,9 @@ type Task struct {
 	DeadLine      string     `db:"deadline" json:"deadline"`
 	DashboardID   string     `db:"dashboardID" json:"dashboardId"`
 	BlockedBy     []string   `db:"blockedBy" json:"blockedBy"`
+	AssignerName  *string    `json:"assignerName,omitempty"`
+	ApproverName  *string    `json:"approverName,omitempty"`
+	ReporterName  *string    `json:"reporterName,omitempty"`
 }
 
 type TaskPatch struct {
