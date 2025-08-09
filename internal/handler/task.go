@@ -68,7 +68,7 @@ func (h *TaskHandler) getTaskByID(c fiber.Ctx) error {
 
 func (h *TaskHandler) updateTask(c fiber.Ctx) error {
 	id := c.Params("id")
-	var task model.Task
+	var task model.TaskPatch
 	if err := c.Bind().JSON(&task); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request"})
 	}

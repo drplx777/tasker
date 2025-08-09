@@ -21,6 +21,22 @@ type Task struct {
 	BlockedBy     []string   `db:"blockedBy" json:"blockedBy"`
 }
 
+type TaskPatch struct {
+	Title         *string    `json:"title,omitempty"`
+	Description   *string    `json:"description,omitempty"`
+	Status        *string    `json:"status,omitempty"`
+	ReporterID    *string    `json:"reporterId,omitempty"`
+	AssignerID    *string    `json:"assignerId,omitempty"`
+	ReviewerID    *string    `json:"reviewerId,omitempty"`
+	ApproverID    *string    `json:"approverId,omitempty"`
+	ApproveStatus *string    `json:"approveStatus,omitempty"`
+	StartedAt     *time.Time `json:"startedAt,omitempty"`
+	CompletedAt   *time.Time `json:"completedAt,omitempty"`
+	DeadLine      *time.Time `json:"deadline,omitempty"`
+	DashboardID   *string    `json:"dashboardId,omitempty"`
+	BlockedBy     *[]string  `json:"blockedBy,omitempty"`
+}
+
 type User struct {
 	ID         int     `db:"id" json:"id"`
 	Name       string  `db:"name" json:"name"`

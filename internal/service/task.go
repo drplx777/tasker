@@ -5,8 +5,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"tasker/internal/model"
 
+	"github.com/jackc/pgx"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -198,65 +200,106 @@ func (s *TaskService) GetTasksByDashboardID(ctx context.Context, dashboardID str
 	return tasks, nil
 }
 
-func (s *TaskService) UpdateTask(ctx context.Context, id string, task model.Task) (*model.Task, error) {
-	const query = `
-        UPDATE tasks SET
-            title = COALESCE($2, title),
-            description = COALESCE($3, description),
-            status = COALESCE($4, status),
-            "assignerID" = COALESCE($5, "assignerID"),
-            "reviewerID" = COALESCE($6, "reviewerID"),
-            "approveStatus" = COALESCE($7, "approveStatus"),
-            "started_At" = COALESCE($8, "started_At"),
-            done_at = COALESCE($9, done_at),
-            deadline = COALESCE($10, deadline),
-            "dashboardID" = COALESCE($11, "dashboardID"),
-            "blockedBy" = COALESCE($12, "blockedBy"),
-            updated_at = NOW()
+func (s *TaskService) UpdateTask(ctx context.Context, id string, patch model.TaskPatch) (*model.Task, error) {
+	// собираем части SET и аргументы
+	set := []string{}
+	args := []any{id}
+	idx := 2
+
+	push := func(col string, val any) {
+		set = append(set, fmt.Sprintf("%s = $%d", col, idx))
+		args = append(args, val)
+		idx++
+	}
+
+	if patch.Title != nil {
+		push("title", *patch.Title)
+	}
+	if patch.Description != nil {
+		push("description", *patch.Description)
+	}
+	if patch.Status != nil {
+		push("status", *patch.Status)
+	}
+	if patch.AssignerID != nil {
+		push(`"assignerID"`, *patch.AssignerID)
+	}
+	if patch.ReviewerID != nil {
+		push(`"reviewerID"`, *patch.ReviewerID)
+	}
+	if patch.ApproveStatus != nil {
+		push(`"approveStatus"`, *patch.ApproveStatus)
+	}
+	if patch.StartedAt != nil {
+		push(`"started_At"`, *patch.StartedAt)
+	}
+	if patch.CompletedAt != nil {
+		push("done_at", *patch.CompletedAt)
+	}
+	if patch.DeadLine != nil {
+		push("deadline", *patch.DeadLine)
+	}
+	if patch.DashboardID != nil {
+		push(`"dashboardID"`, *patch.DashboardID)
+	}
+	if patch.BlockedBy != nil {
+		// передаём []string как аргумент (pgx поддерживает массивы)
+		push(`"blockedBy"`, *patch.BlockedBy)
+	}
+	if patch.ReporterID != nil {
+		push(`"reporterD"`, *patch.ReporterID) // если в БД у тебя действительно колонка "reporterD"
+	}
+	if patch.ApproverID != nil {
+		push(`"approverID"`, *patch.ApproverID)
+	}
+	if patch.ApproveStatus != nil {
+		// уже добавляли выше, но оставил в случае расширения
+	}
+
+	// всегда обновляем updated_at
+	set = append(set, "updated_at = NOW()")
+
+	if len(set) == 1 { // только updated_at — ничего не передано
+		return nil, fmt.Errorf("no fields to update")
+	}
+
+	query := fmt.Sprintf(`
+        UPDATE tasks
+        SET %s
         WHERE id = $1
-        RETURNING 
-            id, title, description, status, "reporterD", "assignerID", "reviewerID", 
+        RETURNING
+            id, title, description, status, "reporterD", "assignerID", "reviewerID",
             "approverID", "approveStatus", created_at, updated_at, "started_At", done_at,
             deadline, "dashboardID", "blockedBy"
-    `
+    `, strings.Join(set, ", "))
 
-	var updatedTask model.Task
-	err := s.dbPool.QueryRow(ctx, query, id,
-		task.Title,
-		task.Description,
-		task.Status,
-		task.AssignerID,
-		task.ReviewerID,
-		task.ApproveStatus,
-		task.StartedAt,
-		task.CompletedAt,
-		task.DeadLine,
-		task.DashboardID,
-		task.BlockedBy,
-	).Scan(
-		&updatedTask.ID,
-		&updatedTask.Title,
-		&updatedTask.Description,
-		&updatedTask.Status,
-		&updatedTask.ReporterID,
-		&updatedTask.AssignerID,
-		&updatedTask.ReviewerID,
-		&updatedTask.ApproverID,
-		&updatedTask.ApproveStatus,
-		&updatedTask.CreatedAt,
-		&updatedTask.UpdatedAt,
-		&updatedTask.StartedAt,
-		&updatedTask.CompletedAt,
-		&updatedTask.DeadLine,
-		&updatedTask.DashboardID,
-		&updatedTask.BlockedBy,
+	var updated model.Task
+	err := s.dbPool.QueryRow(ctx, query, args...).Scan(
+		&updated.ID,
+		&updated.Title,
+		&updated.Description,
+		&updated.Status,
+		&updated.ReporterID,
+		&updated.AssignerID,
+		&updated.ReviewerID,
+		&updated.ApproverID,
+		&updated.ApproveStatus,
+		&updated.CreatedAt,
+		&updated.UpdatedAt,
+		&updated.StartedAt,
+		&updated.CompletedAt,
+		&updated.DeadLine,
+		&updated.DashboardID,
+		&updated.BlockedBy,
 	)
-
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("task %s not found", id)
+		}
 		return nil, err
 	}
 
-	return &updatedTask, nil
+	return &updated, nil
 }
 
 func (s *TaskService) DeleteTask(ctx context.Context, id string) error {
