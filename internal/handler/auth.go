@@ -109,7 +109,7 @@ func (h *AuthHandler) logoutHandler(c fiber.Ctx) error {
 		Name:     "api_token",
 		Value:    "",
 		Path:     "/",
-		Domain:   "", // совпадает с тем, что был установлен
+		Domain:   "localhost", // совпадает с тем, что был установлен
 		MaxAge:   -1,
 		HTTPOnly: true,
 		Secure:   false, // тот же флаг что и в loginHandler
