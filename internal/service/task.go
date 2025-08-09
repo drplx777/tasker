@@ -89,19 +89,21 @@ func (s *TaskService) GetTaskByID(ctx context.Context, id string) (*model.Task, 
       t.deadline, t."dashboardID", t."blockedBy",
       (rep.name || ' ' || rep.surname) AS reporter_name,
       (ass.name || ' ' || ass.surname) AS assigner_name,
-      (app.name || ' ' || app.surname) AS approver_name
+      (app.name || ' ' || app.surname) AS approver_name,
+      d.name AS dashboard_name
     FROM tasks t
     LEFT JOIN users rep ON rep.id::text = t."reporterD"
     LEFT JOIN users ass ON ass.id::text = t."assignerID"
     LEFT JOIN users app ON app.id::text = t."approverID"
+    LEFT JOIN dashboards d ON d.id::text = t."dashboardID"
     WHERE t.id = $1
     `
 
 	var task model.Task
-	// sql.NullString безопасно примет NULL из БД
 	var reporterName sql.NullString
 	var assignerName sql.NullString
 	var approverName sql.NullString
+	var dashboardName sql.NullString
 
 	err := s.dbPool.QueryRow(ctx, query, id).Scan(
 		&task.ID,
@@ -123,6 +125,7 @@ func (s *TaskService) GetTaskByID(ctx context.Context, id string) (*model.Task, 
 		&reporterName,
 		&assignerName,
 		&approverName,
+		&dashboardName,
 	)
 	if err != nil {
 		return nil, err
@@ -139,6 +142,10 @@ func (s *TaskService) GetTaskByID(ctx context.Context, id string) (*model.Task, 
 	if approverName.Valid {
 		v := approverName.String
 		task.ApproverName = &v
+	}
+	if dashboardName.Valid {
+		v := dashboardName.String
+		task.DashboardName = &v
 	}
 
 	return &task, nil

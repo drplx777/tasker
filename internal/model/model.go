@@ -22,6 +22,7 @@ type Task struct {
 	AssignerName  *string    `json:"assignerName,omitempty"`
 	ApproverName  *string    `json:"approverName,omitempty"`
 	ReporterName  *string    `json:"reporterName,omitempty"`
+	DashboardName *string    `json:"dashboardName,omitempty"`
 }
 
 type TaskPatch struct {
