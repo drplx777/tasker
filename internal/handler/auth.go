@@ -23,10 +23,6 @@ func (h *AuthHandler) RegisterRoutes(app *fiber.App) {
 }
 
 // Все хендлеры принимают fiber.Ctx (интерфейс), который реализует context.Context
-func (h *AuthHandler) logoutHandler(c fiber.Ctx) error {
-	c.ClearCookie("api_token")
-	return c.SendStatus(fiber.StatusOK)
-}
 
 func (h *AuthHandler) registerHandler(c fiber.Ctx) error {
 	var req model.RegisterRequest
@@ -101,4 +97,25 @@ func (h *AuthHandler) GetUserHandler(c fiber.Ctx) error {
 	}
 
 	return c.JSON(user)
+}
+
+func (h *AuthHandler) logoutHandler(c fiber.Ctx) error {
+	// 1) Если у тебя будет ревокация refresh-токенов, тут можно вызвать сервис, который пометит token как revoked.
+	// token := c.Cookies("api_token")
+	// _ = h.service.RevokeToken(c.Context(), token) // опционально
+
+	// 2) Явно удалить cookie: выставляем ту же cookie с MaxAge=-1 и пустым значением
+	c.Cookie(&fiber.Cookie{
+		Name:     "api_token",
+		Value:    "",
+		Path:     "/",
+		Domain:   "", // совпадает с тем, что был установлен
+		MaxAge:   -1,
+		HTTPOnly: true,
+		Secure:   false, // тот же флаг что и в loginHandler
+		SameSite: "Lax",
+	})
+
+	// В качестве удобства — вернуть JSON о результате
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"ok": true})
 }
