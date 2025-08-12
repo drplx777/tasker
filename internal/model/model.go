@@ -19,6 +19,7 @@ type Task struct {
 	DeadLine      string     `db:"deadline" json:"deadline"`
 	DashboardID   string     `db:"dashboardID" json:"dashboardId"`
 	BlockedBy     []string   `db:"blockedBy" json:"blockedBy"`
+	Space         *string    `db:"space" json:"space,omitempty"`
 	AssignerName  *string    `json:"assignerName,omitempty"`
 	ApproverName  *string    `json:"approverName,omitempty"`
 	ReporterName  *string    `json:"reporterName,omitempty"`

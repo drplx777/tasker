@@ -42,9 +42,10 @@ func (s *TaskService) CreateTask(ctx context.Context, task model.Task) (*model.T
         "approveStatus",
         deadline,
         "dashboardID",
-        "blockedBy"
+        "blockedBy",
+		"space"
     )
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, $12)
     RETURNING
         id,
         created_at,
@@ -67,6 +68,7 @@ func (s *TaskService) CreateTask(ctx context.Context, task model.Task) (*model.T
 		task.DeadLine,
 		task.DashboardID,
 		blockedBy,
+		task.Space,
 	).Scan(
 		&newTask.ID,
 		&newTask.CreatedAt,
@@ -86,7 +88,7 @@ func (s *TaskService) GetTaskByID(ctx context.Context, id string) (*model.Task, 
     SELECT
       t.id, t.title, t.description, t.status, t."reporterD", t."assignerID", t."reviewerID", t."approverID",
       t."approveStatus", t.created_at, t.updated_at, t."started_At", t.done_at,
-      t.deadline, t."dashboardID", t."blockedBy",
+      t.deadline, t."dashboardID", t."blockedBy", t."space",
       (rep.name || ' ' || rep.surname) AS reporter_name,
       (ass.name || ' ' || ass.surname) AS assigner_name,
       (app.name || ' ' || app.surname) AS approver_name,
@@ -199,7 +201,7 @@ func (s *TaskService) GetTasksByDashboardID(ctx context.Context, dashboardID str
 		SELECT 
 			id, title, description, status, "reporterD", "assignerID", "reviewerID", 
 			"approverID", "approveStatus", created_at, updated_at, "started_At", done_at,
-			deadline, "dashboardID", "blockedBy"
+			deadline, "dashboardID", "blockedBy", "space"
 		FROM tasks WHERE "dashboardID" = $1
 	`
 
