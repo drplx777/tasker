@@ -43,14 +43,14 @@ type TaskPatch struct {
 }
 
 type User struct {
-	ID         int      `db:"id" json:"id"`
-	Name       string   `db:"name" json:"name"`
-	Surname    string   `db:"surname" json:"surname"`
-	Middlename *string  `db:"middlename" json:"middlename,omitempty"`
-	Login      string   `db:"login" json:"login"`
-	RoleID     int      `db:"roleID" json:"roleID"`
-	Password   string   `db:"password" json:"-"`
-	Spaces     []string `db:"spaces" json:"spaces,omitempty"`
+	ID         int       `db:"id" json:"id"`
+	Name       string    `db:"name" json:"name"`
+	Surname    string    `db:"surname" json:"surname"`
+	Middlename *string   `db:"middlename" json:"middlename,omitempty"`
+	Login      string    `db:"login" json:"login"`
+	RoleID     int       `db:"roleID" json:"roleID"`
+	Password   string    `db:"password" json:"-"`
+	Spaces     *[]string `db:"spaces" json:"spaces,omitempty"`
 }
 
 type RegisterRequest struct {
