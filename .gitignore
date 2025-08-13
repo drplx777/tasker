@@ -1,3 +1,5 @@
 .env
 rd.md
 test_flow.sh
+test_flow_jwt_cookie.sh
+test_flow_jwt_cookie_safe.sh
