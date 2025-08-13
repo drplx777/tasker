@@ -61,6 +61,7 @@ func main() {
 	authHandler := handler.NewAuthHandler(authService)
 	taskHandler := handler.NewTaskHandler(taskService)
 	userHandler := handler.NewUserHandler(userService)
+	spaceHandler := handler.NewSpaceHandler(spaceService)
 	dashboardsHandler := handler.NewDashboardsHandler(dashboardService)
 
 	// Регистрация маршрутов
@@ -70,6 +71,7 @@ func main() {
 	taskHandler.RegisterRoutes(app)
 	userHandler.RegisterPublicRoutes(app)
 	dashboardsHandler.RegisterRoutes(app)
+	spaceHandler.RegisterRoutes(app)
 
 	// Graceful shutdown
 	shutdown := make(chan os.Signal, 1)
