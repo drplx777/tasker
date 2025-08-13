@@ -5,29 +5,47 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"tasker/internal/model"
+	"time"
 
-	"github.com/jackc/pgx"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type TaskService struct {
 	dbPool *pgxpool.Pool
+	spaces *SpaceService
 }
 
-func NewTaskService(dbPool *pgxpool.Pool) *TaskService {
-	return &TaskService{dbPool: dbPool}
+// NewTaskService принимает пул и инстанс SpaceService (для проверки членства).
+func NewTaskService(dbPool *pgxpool.Pool, spaces *SpaceService) *TaskService {
+	return &TaskService{dbPool: dbPool, spaces: spaces}
 }
 
 func (s *TaskService) CreateTask(ctx context.Context, task model.Task) (*model.Task, error) {
-	// Подготовка поля blockedBy из массива Blockers
-	const defaultStatus = "to-do"
+	// валидация поля space
+	if task.Space == nil || *task.Space == "" {
+		return nil, fmt.Errorf("space cannot be empty")
+	}
 
-	var blockedBy sql.NullString
-	if len(task.BlockedBy) > 0 && task.BlockedBy[0] != "" {
-		blockedBy.String = task.BlockedBy[0]
-		blockedBy.Valid = true
+	// проверяем, что репортер — член пространства
+	reporterID, err := strconv.Atoi(task.ReporterID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid reporter ID: %w", err)
+	}
+	isMember, _, err := s.spaces.IsMember(ctx, *task.Space, reporterID)
+	if err != nil {
+		return nil, err
+	}
+	if !isMember {
+		return nil, fmt.Errorf("reporter is not a member of the space")
+	}
+
+	// статус по умолчанию, если не задан
+	if task.Status == "" {
+		task.Status = "to-do"
 	}
 
 	const query = `
@@ -43,23 +61,22 @@ func (s *TaskService) CreateTask(ctx context.Context, task model.Task) (*model.T
         deadline,
         "dashboardID",
         "blockedBy",
-		"space"
+        space
     )
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, $12)
-    RETURNING
-        id,
-        created_at,
-        updated_at,
-        "started_At",
-        done_at
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+    RETURNING id, created_at, updated_at, "started_At", done_at
     `
 
-	newTask := task                // копируем входную структуру
-	newTask.Status = defaultStatus // устанавливаем статус по умолчанию
-	err := s.dbPool.QueryRow(ctx, query,
+	var blockedBy []string
+	if len(task.BlockedBy) > 0 {
+		blockedBy = task.BlockedBy
+	}
+
+	// выполняем вставку и считываем автогенерируемые поля
+	err = s.dbPool.QueryRow(ctx, query,
 		task.Title,
 		task.Description,
-		newTask.Status,
+		task.Status,
 		task.ReporterID,
 		task.AssignerID,
 		task.ReviewerID,
@@ -70,17 +87,17 @@ func (s *TaskService) CreateTask(ctx context.Context, task model.Task) (*model.T
 		blockedBy,
 		task.Space,
 	).Scan(
-		&newTask.ID,
-		&newTask.CreatedAt,
-		&newTask.UpdatedAt,
-		&newTask.StartedAt,
-		&newTask.CompletedAt,
+		&task.ID,
+		&task.CreatedAt,
+		&task.UpdatedAt,
+		&task.StartedAt,
+		&task.CompletedAt,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	return &newTask, nil
+	return &task, nil
 }
 
 func (s *TaskService) GetTaskByID(ctx context.Context, id string) (*model.Task, error) {
@@ -88,7 +105,7 @@ func (s *TaskService) GetTaskByID(ctx context.Context, id string) (*model.Task, 
     SELECT
       t.id, t.title, t.description, t.status, t."reporterD", t."assignerID", t."reviewerID", t."approverID",
       t."approveStatus", t.created_at, t.updated_at, t."started_At", t.done_at,
-      t.deadline, t."dashboardID", t."blockedBy", t."space",
+      t.deadline, t."dashboardID", t."blockedBy", t.space,
       (rep.name || ' ' || rep.surname) AS reporter_name,
       (ass.name || ' ' || ass.surname) AS assigner_name,
       (app.name || ' ' || app.surname) AS approver_name,
@@ -106,6 +123,8 @@ func (s *TaskService) GetTaskByID(ctx context.Context, id string) (*model.Task, 
 	var assignerName sql.NullString
 	var approverName sql.NullString
 	var dashboardName sql.NullString
+	var space sql.NullString
+	var blockedBy []string
 
 	err := s.dbPool.QueryRow(ctx, query, id).Scan(
 		&task.ID,
@@ -123,14 +142,24 @@ func (s *TaskService) GetTaskByID(ctx context.Context, id string) (*model.Task, 
 		&task.CompletedAt,
 		&task.DeadLine,
 		&task.DashboardID,
-		&task.BlockedBy,
+		&blockedBy,
+		&space,
 		&reporterName,
 		&assignerName,
 		&approverName,
 		&dashboardName,
 	)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("task %s not found", id)
+		}
 		return nil, err
+	}
+
+	task.BlockedBy = blockedBy
+	if space.Valid {
+		sv := space.String
+		task.Space = &sv
 	}
 
 	if reporterName.Valid {
@@ -158,7 +187,7 @@ func (s *TaskService) ListTasks(ctx context.Context) ([]model.Task, error) {
         SELECT 
             id, title, description, status, "reporterD", "assignerID", "reviewerID", 
             "approverID", "approveStatus", created_at, updated_at, "started_At", done_at,
-            deadline, "dashboardID", "blockedBy"
+            deadline, "dashboardID", "blockedBy", space
         FROM tasks
     `
 	rows, err := s.dbPool.Query(ctx, query)
@@ -167,10 +196,13 @@ func (s *TaskService) ListTasks(ctx context.Context) ([]model.Task, error) {
 	}
 	defer rows.Close()
 
-	tasks := []model.Task{}
+	var tasks []model.Task
 	for rows.Next() {
 		var task model.Task
-		err := rows.Scan(
+		var blockedBy []string
+		var space sql.NullString
+
+		if err := rows.Scan(
 			&task.ID,
 			&task.Title,
 			&task.Description,
@@ -186,22 +218,33 @@ func (s *TaskService) ListTasks(ctx context.Context) ([]model.Task, error) {
 			&task.CompletedAt,
 			&task.DeadLine,
 			&task.DashboardID,
-			&task.BlockedBy,
-		)
-		if err != nil {
+			&blockedBy,
+			&space,
+		); err != nil {
 			return nil, err
+		}
+
+		task.BlockedBy = blockedBy
+		if space.Valid {
+			sv := space.String
+			task.Space = &sv
 		}
 		tasks = append(tasks, task)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return tasks, nil
 }
+
 func (s *TaskService) GetTasksByDashboardID(ctx context.Context, dashboardID string) ([]model.Task, error) {
 	const query = `
 		SELECT 
 			id, title, description, status, "reporterD", "assignerID", "reviewerID", 
 			"approverID", "approveStatus", created_at, updated_at, "started_At", done_at,
-			deadline, "dashboardID", "blockedBy", "space"
+			deadline, "dashboardID", "blockedBy", space
 		FROM tasks WHERE "dashboardID" = $1
 	`
 
@@ -211,10 +254,13 @@ func (s *TaskService) GetTasksByDashboardID(ctx context.Context, dashboardID str
 	}
 	defer rows.Close()
 
-	tasks := []model.Task{}
+	var tasks []model.Task
 	for rows.Next() {
 		var task model.Task
-		err := rows.Scan(
+		var blockedBy []string
+		var space sql.NullString
+
+		if err := rows.Scan(
 			&task.ID,
 			&task.Title,
 			&task.Description,
@@ -230,19 +276,28 @@ func (s *TaskService) GetTasksByDashboardID(ctx context.Context, dashboardID str
 			&task.CompletedAt,
 			&task.DeadLine,
 			&task.DashboardID,
-			&task.BlockedBy,
-		)
-		if err != nil {
+			&blockedBy,
+			&space,
+		); err != nil {
 			return nil, err
 		}
+
+		task.BlockedBy = blockedBy
+		if space.Valid {
+			sv := space.String
+			task.Space = &sv
+		}
 		tasks = append(tasks, task)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return tasks, nil
 }
 
 func (s *TaskService) UpdateTask(ctx context.Context, id string, patch model.TaskPatch) (*model.Task, error) {
-	// собираем части SET и аргументы
 	set := []string{}
 	args := []any{id}
 	idx := 2
@@ -284,25 +339,17 @@ func (s *TaskService) UpdateTask(ctx context.Context, id string, patch model.Tas
 		push(`"dashboardID"`, *patch.DashboardID)
 	}
 	if patch.BlockedBy != nil {
-		// передаём []string как аргумент (pgx поддерживает массивы)
 		push(`"blockedBy"`, *patch.BlockedBy)
 	}
 	if patch.ReporterID != nil {
-		push(`"reporterD"`, *patch.ReporterID) // если в БД у тебя действительно колонка "reporterD"
+		push(`"reporterD"`, *patch.ReporterID)
 	}
 	if patch.ApproverID != nil {
 		push(`"approverID"`, *patch.ApproverID)
 	}
-	if patch.ApproveStatus != nil {
-		// уже добавляли выше, но оставил в случае расширения
-	}
 
 	// всегда обновляем updated_at
-	set = append(set, "updated_at = NOW()")
-
-	if len(set) == 1 { // только updated_at — ничего не передано
-		return nil, fmt.Errorf("no fields to update")
-	}
+	push("updated_at", time.Now())
 
 	query := fmt.Sprintf(`
         UPDATE tasks
@@ -311,10 +358,11 @@ func (s *TaskService) UpdateTask(ctx context.Context, id string, patch model.Tas
         RETURNING
             id, title, description, status, "reporterD", "assignerID", "reviewerID",
             "approverID", "approveStatus", created_at, updated_at, "started_At", done_at,
-            deadline, "dashboardID", "blockedBy"
+            deadline, "dashboardID", "blockedBy", space
     `, strings.Join(set, ", "))
 
 	var updated model.Task
+	// QueryRow принимает args... (распакуем slice)
 	err := s.dbPool.QueryRow(ctx, query, args...).Scan(
 		&updated.ID,
 		&updated.Title,
@@ -332,6 +380,7 @@ func (s *TaskService) UpdateTask(ctx context.Context, id string, patch model.Tas
 		&updated.DeadLine,
 		&updated.DashboardID,
 		&updated.BlockedBy,
+		&updated.Space,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
@@ -350,24 +399,24 @@ func (s *TaskService) DeleteTask(ctx context.Context, id string) error {
 
 func (s *TaskService) MarkTaskDone(ctx context.Context, id string) (*model.Task, error) {
 	const selectQuery = `
-        SELECT "blockedBy", "approveStatus"
+        SELECT blockedBy, "approveStatus"
         FROM tasks
         WHERE id = $1
     `
-	var blockedBy sql.NullString
+	var blockedBy []string
 	var approveStatus string
 
 	err := s.dbPool.QueryRow(ctx, selectQuery, id).Scan(&blockedBy, &approveStatus)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("task with id %q not found", id)
 		}
 		return nil, err
 	}
 
 	// 2) Проверяем, заблокирована ли задача
-	if blockedBy.Valid && blockedBy.String != "" {
-		return nil, fmt.Errorf("cannot mark done: task is blocked by %s", blockedBy.String)
+	if len(blockedBy) > 0 {
+		return nil, fmt.Errorf("cannot mark done: task is blocked by %v", blockedBy)
 	}
 
 	// 3) Проверяем статус одобрения
@@ -384,10 +433,13 @@ func (s *TaskService) MarkTaskDone(ctx context.Context, id string) (*model.Task,
         RETURNING 
             id, title, description, status, "reporterD", "assignerID", "reviewerID", 
             "approverID", "approveStatus", created_at, updated_at, "started_At", done_at,
-            deadline, "dashboardID", "blockedBy"
+            deadline, "dashboardID", "blockedBy", space
     `
 
 	var task model.Task
+	var blocked []string
+	var space sql.NullString
+
 	err = s.dbPool.QueryRow(ctx, query, id).Scan(
 		&task.ID,
 		&task.Title,
@@ -404,10 +456,20 @@ func (s *TaskService) MarkTaskDone(ctx context.Context, id string) (*model.Task,
 		&task.CompletedAt,
 		&task.DeadLine,
 		&task.DashboardID,
-		&task.BlockedBy,
+		&blocked,
+		&space,
 	)
+	if err != nil {
+		return nil, err
+	}
 
-	return &task, err
+	task.BlockedBy = blocked
+	if space.Valid {
+		sv := space.String
+		task.Space = &sv
+	}
+
+	return &task, nil
 }
 
-//TO-DO: UpdateApproveStatugos
+// TODO: UpdateApproveStatuses

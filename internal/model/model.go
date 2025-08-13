@@ -70,3 +70,17 @@ type DashBoards struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }
+
+type Space struct {
+	ID        string    `db:"id" json:"id"`
+	Name      string    `db:"name" json:"name"`
+	CreatorID int       `db:"creator_id" json:"creatorId"`
+	CreatedAt time.Time `db:"created_at" json:"createdAt"`
+}
+
+type SpaceMembership struct {
+	SpaceID  string    `db:"space_id" json:"spaceId"`
+	UserID   int       `db:"user_id" json:"userId"`
+	Role     string    `db:"role" json:"role"`
+	JoinedAt time.Time `db:"joined_at" json:"joinedAt"`
+}
