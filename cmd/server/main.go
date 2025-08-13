@@ -32,8 +32,9 @@ func main() {
 	defer dbPool.Close()
 
 	// Инициализация сервисов
+	spaceService := service.NewSpaceService(dbPool)
 	authService := service.NewAuthService(dbPool, cfg.JWTSecret)
-	taskService := service.NewTaskService(dbPool)
+	taskService := service.NewTaskService(dbPool, spaceService)
 	userService := service.NewUserService(dbPool)
 	dashboardService := service.NewDashboardService(dbPool)
 
