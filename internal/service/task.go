@@ -420,7 +420,7 @@ func (s *TaskService) MarkTaskDone(ctx context.Context, id string) (*model.Task,
 	}
 
 	// 3) Проверяем статус одобрения
-	if approveStatus == "need-approve" {
+	if approveStatus == "need-approval" {
 		return nil, errors.New("cannot mark done: task needs approval")
 	}
 
