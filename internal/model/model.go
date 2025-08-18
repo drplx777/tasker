@@ -37,7 +37,7 @@ type TaskPatch struct {
 	ApproveStatus *string    `json:"approveStatus,omitempty"`
 	StartedAt     *time.Time `json:"startedAt,omitempty"`
 	CompletedAt   *time.Time `json:"completedAt,omitempty"`
-	DeadLine      *time.Time `json:"deadline,omitempty"`
+	DeadLine      *string    `json:"deadline,omitempty"`
 	DashboardID   *string    `json:"dashboardId,omitempty"`
 	BlockedBy     *[]string  `json:"blockedBy,omitempty"`
 }

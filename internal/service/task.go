@@ -297,7 +297,58 @@ func (s *TaskService) GetTasksByDashboardID(ctx context.Context, dashboardID str
 	return tasks, nil
 }
 
-func (s *TaskService) UpdateTask(ctx context.Context, id string, patch model.TaskPatch) (*model.Task, error) {
+func (s *TaskService) UpdateTask(ctx context.Context, id string, patchAny any) (*model.Task, error) {
+	// Приводим вход к model.TaskPatch (если передали model.Task - создаём patch из всех полей)
+	var patch model.TaskPatch
+
+	switch v := patchAny.(type) {
+	case model.TaskPatch:
+		patch = v
+	case *model.TaskPatch:
+		if v != nil {
+			patch = *v
+		}
+	case model.Task:
+		patch = model.TaskPatch{
+			Title:         &v.Title,
+			Description:   &v.Description,
+			Status:        &v.Status,
+			AssignerID:    v.AssignerID,
+			ReviewerID:    v.ReviewerID,
+			ApproveStatus: &v.ApproveStatus,
+			StartedAt:     v.StartedAt,
+			CompletedAt:   v.CompletedAt,
+			DeadLine:      &v.DeadLine,
+			DashboardID:   &v.DashboardID,
+			BlockedBy:     &v.BlockedBy,
+			ReporterID:    &v.ReporterID,
+			ApproverID:    &v.ApproverID,
+			// добавьте остальные поля по необходимости
+		}
+	case *model.Task:
+		if v != nil {
+			patch = model.TaskPatch{
+				Title:         &v.Title,
+				Description:   &v.Description,
+				Status:        &v.Status,
+				AssignerID:    v.AssignerID,
+				ReviewerID:    v.ReviewerID,
+				ApproveStatus: &v.ApproveStatus,
+				StartedAt:     v.StartedAt,
+				CompletedAt:   v.CompletedAt,
+				DeadLine:      &v.DeadLine,
+				DashboardID:   &v.DashboardID,
+				BlockedBy:     &v.BlockedBy,
+				ReporterID:    &v.ReporterID,
+				ApproverID:    &v.ApproverID,
+				// ...
+			}
+		}
+	default:
+		return nil, fmt.Errorf("unsupported patch type %T", patchAny)
+	}
+
+	// --- далее — прежняя реализация, только используем полученный patch ---
 	set := []string{}
 	args := []any{id}
 	idx := 2
@@ -362,7 +413,6 @@ func (s *TaskService) UpdateTask(ctx context.Context, id string, patch model.Tas
     `, strings.Join(set, ", "))
 
 	var updated model.Task
-	// QueryRow принимает args... (распакуем slice)
 	err := s.dbPool.QueryRow(ctx, query, args...).Scan(
 		&updated.ID,
 		&updated.Title,
