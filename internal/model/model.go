@@ -58,7 +58,8 @@ type RegisterRequest struct {
 	Surname    string `json:"surname"`
 	Middlename string `json:"middlename"`
 	Login      string `json:"login"`
-	RoleID     int    `json:"roleID"`
+	Role       string `json:"role"`
+	SpaceName  string `json:"spaceName,omitempty"`
 	Password   string `json:"password"`
 }
 

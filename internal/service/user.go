@@ -2,8 +2,10 @@ package service
 
 import (
 	"context"
+	"errors"
 	"tasker/internal/model"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -16,29 +18,63 @@ func NewUserService(dbPool *pgxpool.Pool) *UserService {
 	return &UserService{dbPool: dbPool}
 }
 
+func (s *UserService) getOrCreateRoleID(ctx context.Context, roleName string) (int, error) {
+	var id int
+	if roleName == "" {
+		roleName = "user"
+	}
+	// попробуем найти
+	if err := s.dbPool.QueryRow(ctx, `SELECT id FROM roles WHERE name = $1`, roleName).Scan(&id); err == nil {
+		return id, nil
+	} else {
+		// если ошибка не pgx.ErrNoRows — вернуть ошибку
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return 0, err
+		}
+	}
+	// создаём роль
+	if err := s.dbPool.QueryRow(ctx, `INSERT INTO roles (name) VALUES ($1) RETURNING id`, roleName).Scan(&id); err != nil {
+		return 0, err
+	}
+	return id, nil
+}
+
 func (s *UserService) Register(ctx context.Context, req model.RegisterRequest) (*model.User, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
 	}
 
+	// определяем системную роль по строке req.Role
+	roleName := req.Role
+	if roleName == "" {
+		roleName = "user"
+	}
+	roleID, err := s.getOrCreateRoleID(ctx, roleName)
+	if err != nil {
+		return nil, err
+	}
+
 	const query = `
-        INSERT INTO users (name, surname, middlename, login, roleID, password) 
+        INSERT INTO users (name, surname, middlename, login, roleid, password) 
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING id
     `
 
 	var userID int
-	err = s.dbPool.QueryRow(ctx, query,
+	var middlenamePtr *string
+	if req.Middlename != "" {
+		middlenamePtr = &req.Middlename
+	}
+
+	if err := s.dbPool.QueryRow(ctx, query,
 		req.Name,
 		req.Surname,
-		req.Middlename,
+		middlenamePtr,
 		req.Login,
-		req.RoleID,
+		roleID,
 		string(hashedPassword),
-	).Scan(&userID)
-
-	if err != nil {
+	).Scan(&userID); err != nil {
 		return nil, err
 	}
 
@@ -46,9 +82,9 @@ func (s *UserService) Register(ctx context.Context, req model.RegisterRequest) (
 		ID:         userID,
 		Name:       req.Name,
 		Surname:    req.Surname,
-		Middlename: &req.Middlename,
+		Middlename: middlenamePtr,
 		Login:      req.Login,
-		RoleID:     req.RoleID,
+		RoleID:     roleID,
 	}, nil
 }
 

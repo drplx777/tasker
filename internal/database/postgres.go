@@ -54,19 +54,13 @@ func NewPool(ctx context.Context, connString string) (*pgxpool.Pool, error) {
 }
 
 func createTables(ctx context.Context, pool *pgxpool.Pool) error {
-	// Создаём структуры таблиц в правильном порядке
 	baseSQL := `
     CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
     CREATE TABLE IF NOT EXISTS roles (
         id SERIAL PRIMARY KEY,
-        name VARCHAR(100) NOT NULL,
+        name VARCHAR(100) NOT NULL UNIQUE,
         maindashboard INTEGER
-    );
-
-    CREATE TABLE IF NOT EXISTS dashboards (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(100) NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS users (
@@ -75,18 +69,29 @@ func createTables(ctx context.Context, pool *pgxpool.Pool) error {
         surname TEXT NOT NULL,
         middlename TEXT,
         login TEXT NOT NULL UNIQUE,
-        roleid INTEGER NOT NULL,
+        roleid INTEGER NOT NULL REFERENCES roles(id) ON DELETE SET NULL,
         password TEXT NOT NULL,
         token TEXT,
         spaces TEXT[]    -- временно храним, если есть старые данные
     );
 
-    -- spaces нужно создать ДО space_memberships, т.к. у latter есть FK на spaces
     CREATE TABLE IF NOT EXISTS spaces (
         id TEXT PRIMARY KEY DEFAULT (uuid_generate_v4()::text),
         name TEXT NOT NULL,
         creator_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS dashboards (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        space_id TEXT REFERENCES spaces(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS space_roles (
+        space_id TEXT NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
+        name VARCHAR(100) NOT NULL,
+        PRIMARY KEY (space_id, name)
     );
 
     CREATE TABLE IF NOT EXISTS space_memberships (
@@ -127,7 +132,14 @@ func createTables(ctx context.Context, pool *pgxpool.Pool) error {
 		return fmt.Errorf("create base tables: %w", err)
 	}
 
-	// Если есть users.spaces (старые данные), мигрируем их в spaces и space_memberships
+	if _, err := pool.Exec(ctx, `ALTER TABLE dashboards ADD COLUMN IF NOT EXISTS space_id TEXT`); err != nil {
+		return fmt.Errorf("ensure dashboards.space_id: %w", err)
+	}
+
+	if _, err := pool.Exec(ctx, baseSQL); err != nil {
+		return fmt.Errorf("create base tables: %w", err)
+	}
+
 	var hasSpacesColumn bool
 	err := pool.QueryRow(ctx, `
         SELECT EXISTS (

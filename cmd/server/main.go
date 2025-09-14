@@ -23,7 +23,6 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 
-	// Создаем строку подключения к БД
 	dbURL := config.BuildDBConnectionString(cfg.DB)
 	dbPool, err := database.NewPool(context.Background(), dbURL)
 	if err != nil {
@@ -31,9 +30,8 @@ func main() {
 	}
 	defer dbPool.Close()
 
-	// Инициализация сервисов
 	spaceService := service.NewSpaceService(dbPool)
-	authService := service.NewAuthService(dbPool, cfg.JWTSecret)
+	authService := service.NewAuthService(dbPool, cfg.JWTSecret, spaceService) // <-- передаём spaceService
 	taskService := service.NewTaskService(dbPool, spaceService)
 	userService := service.NewUserService(dbPool)
 	dashboardService := service.NewDashboardService(dbPool)
@@ -61,7 +59,7 @@ func main() {
 	authHandler := handler.NewAuthHandler(authService)
 	taskHandler := handler.NewTaskHandler(taskService)
 	userHandler := handler.NewUserHandler(userService)
-	spaceHandler := handler.NewSpaceHandler(spaceService)
+	spaceHandler := handler.NewSpaceHandler(spaceService, dashboardService) // <-- передаём dashboardService
 	dashboardsHandler := handler.NewDashboardsHandler(dashboardService)
 
 	// Регистрация маршрутов
@@ -73,7 +71,6 @@ func main() {
 	dashboardsHandler.RegisterRoutes(app)
 	spaceHandler.RegisterRoutes(app)
 
-	// Graceful shutdown
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
 
