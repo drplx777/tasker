@@ -18,22 +18,21 @@ func NewSpaceHandler(spaceSvc *service.SpaceService, dashSvc *service.DashboardS
 
 func (h *SpaceHandler) RegisterRoutes(app *fiber.App) {
 	grp := app.Group("/spaces")
-	grp.Post("/:id/dashboards", h.createDashboard)         // POST /spaces/:id/dashboards
-	grp.Delete("/:id/dashboards/:dbid", h.deleteDashboard) // DELETE /spaces/:id/dashboards/:dbid
-	grp.Get("/:id/dashboards", h.listSpaceDashboards)      // GET /spaces/:id/dashboards
+	grp.Post("/:id/dashboards", h.createDashboard)
+	grp.Delete("/:id/dashboards/:dbid", h.deleteDashboard)
+	grp.Get("/:id/dashboards", h.listSpaceDashboards)
 
-	grp.Delete("/:id/members/:userId", h.removeMember)  // DELETE member
-	grp.Put("/:id/members/:userId", h.updateMemberRole) // PUT change role
-	grp.Get("/:id/token", h.getSpaceToken)              // GET token (space id)
-	grp.Post("/join", h.joinByToken)                    // POST /spaces/jjoin body { token, role(opt) }
+	grp.Delete("/:id/members/:userId", h.removeMember)
+	grp.Put("/:id/members/:userId", h.updateMemberRole)
+	grp.Get("/:id/token", h.getSpaceToken)
+	grp.Post("/join", h.joinByToken)
 
-	// roles
 	grp.Post("/:id/roles", h.addRole)
 	grp.Delete("/:id/roles/:role", h.removeRole)
 	grp.Get("/:id/roles", h.listRoles)
 
-	grp.Get("/:id", h.getSpaceByID) // GET /spaces/:id
-	grp.Get("/", h.listMySpaces)    // GET /spaces
+	grp.Get("/:id", h.getSpaceByID)
+	grp.Get("/", h.listMySpaces)
 }
 
 func (h *SpaceHandler) createDashboard(c fiber.Ctx) error {
@@ -42,7 +41,7 @@ func (h *SpaceHandler) createDashboard(c fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "unauthorized"})
 	}
 	spaceID := c.Params("id")
-	// проверка прав: только admin может
+
 	isMember, role, err := h.spaceSvc.IsMember(c, spaceID, uid)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -94,14 +93,12 @@ func (h *SpaceHandler) listSpaceDashboards(c fiber.Ctx) error {
 	return c.JSON(ds)
 }
 
-// remove member
 func (h *SpaceHandler) removeMember(c fiber.Ctx) error {
 	uid, err := getUserIDFromCtx(c)
 	if err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "unauthorized"})
 	}
 	spaceID := c.Params("id")
-	// только admin
 	isMember, role, err := h.spaceSvc.IsMember(c, spaceID, uid)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -122,7 +119,6 @@ func (h *SpaceHandler) removeMember(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-// update member role
 func (h *SpaceHandler) updateMemberRole(c fiber.Ctx) error {
 	uid, err := getUserIDFromCtx(c)
 	if err != nil {
@@ -152,7 +148,6 @@ func (h *SpaceHandler) updateMemberRole(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-// get token (space id) — доступен только admin/creator
 func (h *SpaceHandler) getSpaceToken(c fiber.Ctx) error {
 	uid, err := getUserIDFromCtx(c)
 	if err != nil {
@@ -170,7 +165,6 @@ func (h *SpaceHandler) getSpaceToken(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"token": spaceID})
 }
 
-// join by token
 func (h *SpaceHandler) joinByToken(c fiber.Ctx) error {
 	uid, err := getUserIDFromCtx(c)
 	if err != nil {
@@ -192,7 +186,6 @@ func (h *SpaceHandler) joinByToken(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-// roles
 func (h *SpaceHandler) addRole(c fiber.Ctx) error {
 	uid, err := getUserIDFromCtx(c)
 	if err != nil {
@@ -250,29 +243,20 @@ func (h *SpaceHandler) listRoles(c fiber.Ctx) error {
 	return c.JSON(roles)
 }
 
-// getSpaceByID — GET /spaces/:id
 func (h *SpaceHandler) getSpaceByID(c fiber.Ctx) error {
 	spaceID := c.Params("id")
 	if spaceID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "space id required"})
 	}
-
-	// Если позже добавим SpaceService.GetSpaceByID, здесь можно вернуть полную запись.
-	// Сейчас возвращаем минимальную информацию.
 	return c.JSON(fiber.Map{"id": spaceID})
 }
 
-// listMySpaces — GET /spaces
-// Возвращает список пространств, где текущий пользователь состоит.
-// Пока не реализовано в SpaceService, возвращаем 501.
 func (h *SpaceHandler) listMySpaces(c fiber.Ctx) error {
 	return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{"error": "not implemented, add ListSpaces in SpaceService"})
 }
 
-// getUserIDFromCtx получает user id (int) из контекста Fiber.
-// Сначала смотрит c.Locals("userID"), затем заголовок X-User-ID.
+// getUserIDFromCtx — helper
 func getUserIDFromCtx(c fiber.Ctx) (int, error) {
-	// Попробуем c.Locals (middleware может положить туда user id)
 	if v := c.Locals("userID"); v != nil {
 		switch t := v.(type) {
 		case int:
@@ -283,10 +267,11 @@ func getUserIDFromCtx(c fiber.Ctx) (int, error) {
 			if id, err := strconv.Atoi(t); err == nil {
 				return id, nil
 			}
+		case float64:
+			return int(t), nil
 		}
 	}
 
-	// fallback: заголовок X-User-ID
 	if h := c.Get("X-User-ID"); h != "" {
 		if id, err := strconv.Atoi(h); err == nil {
 			return id, nil

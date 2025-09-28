@@ -29,7 +29,7 @@ func (h *TaskHandler) RegisterRoutes(app *fiber.App) {
 
 func (h *TaskHandler) createTask(c fiber.Ctx) error {
 	var task model.Task
-	if err := c.Bind().JSON(&task); err != nil {
+	if err := c.Bind().Body(&task); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request"})
 	}
 
@@ -48,6 +48,7 @@ func (h *TaskHandler) listTasks(c fiber.Ctx) error {
 	}
 	return c.JSON(tasks)
 }
+
 func (h *TaskHandler) GetTasksByDashboardID(c fiber.Ctx) error {
 	id := c.Params("id")
 	tasks, err := h.service.GetTasksByDashboardID(c, id)
@@ -68,12 +69,12 @@ func (h *TaskHandler) getTaskByID(c fiber.Ctx) error {
 
 func (h *TaskHandler) updateTask(c fiber.Ctx) error {
 	id := c.Params("id")
-	var task model.TaskPatch
-	if err := c.Bind().JSON(&task); err != nil {
+	var patch model.TaskPatch
+	if err := c.Bind().Body(&patch); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request"})
 	}
 
-	updatedTask, err := h.service.UpdateTask(c, id, task)
+	updatedTask, err := h.service.UpdateTask(c, id, patch)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update task"})
 	}

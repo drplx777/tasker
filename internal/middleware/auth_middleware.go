@@ -9,6 +9,7 @@ import (
 
 func AuthMiddleware(authService *service.AuthService) fiber.Handler {
 	return func(c fiber.Ctx) error {
+		// пропускаем публичные роуты
 		if c.Path() == "/api/login" || c.Path() == "/api/register" {
 			return c.Next()
 		}
@@ -25,13 +26,18 @@ func AuthMiddleware(authService *service.AuthService) fiber.Handler {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid token"})
 		}
 
-		userID, ok := claims["sub"].(float64)
-		if !ok {
-			slog.Error("Invalid user ID in token", "userID", claims["sub"])
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Internal server error"})
+		// sub может прийти как float64 — приведём к int
+		userID := 0
+		switch v := claims["sub"].(type) {
+		case float64:
+			userID = int(v)
+		case int:
+			userID = v
+		case int64:
+			userID = int(v)
 		}
 
-		c.Locals("userID", int(userID))
+		c.Locals("userID", userID)
 		c.Locals("userRole", claims["role"])
 
 		return c.Next()

@@ -20,6 +20,7 @@ func (h *DashboardsHandler) RegisterRoutes(app *fiber.App) {
 	app.Get("/GetDBbyId/:id", h.GetDashboardById)
 	app.Post("/CreateDB", h.CreateDB)
 }
+
 func (h *DashboardsHandler) listDashboards(c fiber.Ctx) error {
 	dashboards, err := h.service.ListDashboards(c)
 	if err != nil {
@@ -39,7 +40,7 @@ func (h *DashboardsHandler) GetDashboardById(c fiber.Ctx) error {
 
 func (h *DashboardsHandler) CreateDB(c fiber.Ctx) error {
 	var dashboard model.DashBoards
-	if err := c.Bind().JSON(&dashboard); err != nil {
+	if err := c.Bind().Body(&dashboard); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request"})
 	}
 

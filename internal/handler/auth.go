@@ -22,16 +22,13 @@ func (h *AuthHandler) RegisterRoutes(app *fiber.App) {
 	app.Post("/api/logout", h.logoutHandler)
 }
 
-// Все хендлеры принимают fiber.Ctx (интерфейс), который реализует context.Context
-
 func (h *AuthHandler) registerHandler(c fiber.Ctx) error {
 	var req model.RegisterRequest
 	if err := c.Bind().Body(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request"})
 	}
 
-	// Передаём сам Ctx как context.Context
-	user, err := h.service.Register(c, req)
+	user, err := h.service.Register(c, req) // c (fiber.Ctx) реализует context.Context в v3
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Registration failed"})
 	}
@@ -45,11 +42,12 @@ func (h *AuthHandler) loginHandler(c fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request"})
 	}
 
-	// Передаём Ctx напрямую
-	token, _, exp, err := h.service.Login(c, req.Login, req.Password)
+	token, user, exp, err := h.service.Login(c, req.Login, req.Password)
 	if err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid credentials"})
 	}
+
+	// Установка cookie с токеном
 	c.Cookie(&fiber.Cookie{
 		Expires:  exp,
 		Name:     "api_token",
@@ -58,10 +56,11 @@ func (h *AuthHandler) loginHandler(c fiber.Ctx) error {
 		Domain:   "localhost",
 		SameSite: fiber.CookieSameSiteLaxMode,
 		Secure:   false,
-		HTTPOnly: false,
+		HTTPOnly: true, // делает cookie недоступным из JS (лучше выставлять true)
 	})
 
-	return c.SendStatus(200)
+	// Возвращаем профиль юзера (без пароля)
+	return c.Status(fiber.StatusOK).JSON(user)
 }
 
 func (h *AuthHandler) validateTokenHandler(c fiber.Ctx) error {
@@ -83,39 +82,42 @@ func (h *AuthHandler) validateTokenHandler(c fiber.Ctx) error {
 }
 
 func (h *AuthHandler) GetUserHandler(c fiber.Ctx) error {
-	// Получаем userID из middleware
 	userIDVal := c.Locals("userID")
 	userID, ok := userIDVal.(int)
+	if !ok {
+		// попробуем для безопасности обработать возможный int64/float64
+		switch v := userIDVal.(type) {
+		case int64:
+			userID = int(v)
+			ok = true
+		case float64:
+			userID = int(v)
+			ok = true
+		}
+	}
 	if !ok {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "User not authenticated"})
 	}
 
-	// Ctx реализует context.Context
 	user, err := h.service.GetUserByID(c, userID)
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
 	}
-
 	return c.JSON(user)
 }
 
 func (h *AuthHandler) logoutHandler(c fiber.Ctx) error {
-	// 1) Если у тебя будет ревокация refresh-токенов, тут можно вызвать сервис, который пометит token как revoked.
-	// token := c.Cookies("api_token")
-	// _ = h.service.RevokeToken(c.Context(), token) // опционально
-
-	// 2) Явно удалить cookie: выставляем ту же cookie с MaxAge=-1 и пустым значением
+	// Очистка cookie
 	c.Cookie(&fiber.Cookie{
 		Name:     "api_token",
 		Value:    "",
 		Path:     "/",
-		Domain:   "localhost", // совпадает с тем, что был установлен
+		Domain:   "localhost",
 		MaxAge:   -1,
 		HTTPOnly: true,
-		Secure:   false, // тот же флаг что и в loginHandler
-		SameSite: "Lax",
+		Secure:   false,
+		SameSite: fiber.CookieSameSiteLaxMode,
 	})
 
-	// В качестве удобства — вернуть JSON о результате
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"ok": true})
 }

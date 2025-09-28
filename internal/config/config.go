@@ -75,3 +75,24 @@ func BuildDBConnectionString(cfg DBConfig) string {
 		"@" + cfg.Host + ":" + cfg.Port + "/" + cfg.Name +
 		"?sslmode=disable"
 }
+func MustLoadTest() *Config {
+	// Используем значения по умолчанию для тестов
+	return &Config{
+		Port:      "3000",
+		JWTSecret: "test-secret-key",
+		DB: DBConfig{
+			Host:     "localhost",
+			Port:     "5432",
+			Name:     "tasker_test",
+			User:     "postgres",
+			Password: "password",
+		},
+		CORS: CORSConfig{
+			AllowOrigins:     []string{"http://localhost:3000"},
+			AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+			AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+			AllowCredentials: true,
+			ExposeHeaders:    []string{"Authorization"},
+		},
+	}
+}
